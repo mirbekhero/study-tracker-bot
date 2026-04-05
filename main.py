@@ -1,7 +1,7 @@
 import asyncio
 import os
 from datetime import datetime
-import pytz  # Библиотека для часовых поясов
+import pytz
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -10,29 +10,19 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 import database as db
 
-# 1. Загрузка настроек
 load_dotenv()
 db.init_db()
 
 TOKEN = os.getenv("BOT_TOKEN")
-
-# 2. Настройка часового пояса Бишкека
 bishkek_tz = pytz.timezone('Asia/Bishkek')
-
-# 3. Настройка прокси (для бесплатного тарифа PythonAnywhere)
 if os.environ.get('PYTHONANYWHERE_DOMAIN'):
     session = AiohttpSession(proxy="http://proxy.server:3128")
     bot = Bot(token=TOKEN, session=session)
 else:
-    # Для работы на домашнем компьютере (PyCharm)
     bot = Bot(token=TOKEN)
 
 dp = Dispatcher()
-# Создаем планировщик с привязкой к нашему времени
 scheduler = AsyncIOScheduler(timezone=bishkek_tz)
-
-
-# Функция, которая отправит сообщение, когда придет время
 async def send_reminder(chat_id, text):
     try:
         await bot.send_message(chat_id, f"⏰ **ВРЕМЯ ВЫШЛО!**\n\nНужно сделать: {text}")
@@ -77,31 +67,25 @@ async def handle_text(message: types.Message):
     task_text = user_input
     reminder_info = ""
 
-    # Проверка на наличие времени (разделитель "|")
+
     if "|" in user_input:
         parts = user_input.split("|")
         task_text = parts[0].strip()
         time_str = parts[1].strip()
 
         try:
-            # Получаем текущее время в Бишкеке
             now = datetime.now(bishkek_tz)
 
-            # Парсим введенное время
             time_obj = datetime.strptime(time_str, "%H:%M")
 
-            # Создаем полную дату для напоминания (сегодняшнее число + введенное время)
+
             target_time = bishkek_tz.localize(datetime(
                 year=now.year, month=now.month, day=now.day,
                 hour=time_obj.hour, minute=time_obj.minute
             ))
-
-            # Если время уже прошло сегодня, не ставим задачу
             if target_time < now:
                 await message.answer("❌ Это время уже прошло! Введи время в будущем.")
                 return
-
-            # Добавляем задачу в планировщик
             scheduler.add_job(
                 send_reminder,
                 "date",
@@ -114,7 +98,6 @@ async def handle_text(message: types.Message):
             await message.answer("❌ Неверный формат времени! Пиши так: `Задача | 15:30`")
             return
 
-    # Сохраняем в базу данных
     db.add_user_if_not_exists(message.from_user.id)
     db.add_task(message.from_user.id, task_text)
 
